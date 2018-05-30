@@ -60,6 +60,9 @@ export default {
 
         switch (payload.event) {
           case 'NEW_MESSAGE':
+            const parser = new DOMParser()
+            const doc = parser.parseFromString(payload.message, 'text/html')
+            
             _this.handleMessage(payload.message)
             break;
         
@@ -83,7 +86,60 @@ export default {
       }
     },
     handleMessage(e) {
-      this.sendMessage(e)
+      this.sendNoShow(e)
+    },
+    async sendNoShow(text) {
+      // validations
+      if (!this.guid) return alert('Session not initialized')
+      if (!text) return
+      if (text.length <= 0) return
+
+      this.loader = true
+
+      // push self message to conversation array
+      //this.messages.push({text, self: true, date: Date.now(), id: guid()})
+      this.text = ''
+      setTimeout(() => this.$scrollTo('#loader-msg', 500, {container: '.messages-c', easing: 'ease-in-out'}), 100)
+
+      // make request to Motion.ai
+      try {
+        const res = await axios.get(`${API}/messageBot?bot=${this.bot}&msg=${text}&session=${this.guid}&key=${API_KEY}`)
+        // extract video and img tags
+        const vList = res.data.botResponse ? res.data.botResponse.match(/\[video\](.*?)\[\/video\]/g) : []
+        const videos = vList ? vList.map(v => v.replace('[video]', '').replace('[/video]')) : []
+
+        // split responsec
+        const temp = res.data.botResponse ? res.data.botResponse.replace(/\r?\n|\r/g, '') : res.data.err
+        const nextRegex = /::next(?:-\d*)?::/g
+        const msgArr = temp.split(nextRegex)
+        var delays = temp.match(nextRegex)
+
+        msgArr.forEach((m, i) => {
+          const msg = {text: m.replace(/\[video\](.*?)\[\/video\]/g, ''), id: guid(), date: Date.now(), quick: res.data.quickReplies, cards: res.data.cards, videos}
+          if (delays && delays.length > 0 && i > 0) {
+            if (!delays[i - 1]) {
+              this.messages.push(msg)
+            } else if (delays[i - 1] == '::next::') {
+              this.messages.push(msg)
+            } else {
+              const delay = parseInt(delays[i - 1].replace(/::/g, '').replace('next-', ''))
+              setTimeout(() => this.messages.push(msg), delay)
+            }
+          } else {
+            this.messages.push(msg)
+          }
+        })
+
+
+        // scrollTo new message
+        this.$scrollTo('#loader-msg', 1000, {container: '.messages-c', easing: 'ease-in-out'})
+        this.loader = false
+      } catch (e) {
+        this.loader = false
+        console.log(e)
+        alert('Error with motion')
+      }
+
     },
     async sendMessage(text) {
       // validations
@@ -186,16 +242,18 @@ export default {
   // messages
   .message {
     padding: 1rem;
-    background-color: #30a7cc;
+    background-color: #DC1E35;
     color: white;
     border-radius: 10px;
     margin: 0 1rem 1rem;
     overflow-y: visible;
     font-size: 1rem;
+
     .time {
       font-size: 0.75rem;
       color: rgba(255, 255, 255, 0.8)
     }
+
     .triangle-out {
       position: absolute;
       margin-left: -1.5rem;
@@ -203,13 +261,16 @@ export default {
       height: 0;
       border-top: 10px solid transparent;
       border-bottom: 10px solid transparent;
-      border-right:10px solid #30a7cc;
+      border-right:10px solid #DC1E35;
     }
+    
   }
+
   .self {
-    background-color: #b6b6b6;
+    background-color: #747474;
     margin-left: auto;
   }
+
   .out {
     align-self: flex-start;
   }
@@ -225,7 +286,7 @@ export default {
     width: 10%;
     height: 100%;
     color: white;
-    background-color: #30a7cc;
+    background-color: #DC1E35;
     border: none;
     text-transform: uppercase;
     font-size: 0.65rem;

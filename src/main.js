@@ -9,8 +9,10 @@ import VueScrollTo from 'vue-scrollto'
 import './assets/app.scss'
 
 import ChatWindow from './components/chat-window'
+import Message from './components/message'
 
 Vue.component('chat-window', ChatWindow)
+Vue.component('message', Message)
 
 Vue.config.productionTip = false
 Vue.use(VueScrollTo)
